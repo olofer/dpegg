@@ -41,18 +41,35 @@ USAGE:
 
 */
 
-// TODO: allow --random as tie break
-// TODO: allow tie break variation selecting maximum equivalent action (instead of minimum)
-// TODO: implement the classic max floor algorithm as "check"
+// TODO: allow --random as tie break ?
+// TODO: additional switch forcing argmin to scan from the end of a vector ?
 
 
 #include <iostream>
 #include <iomanip>
 #include <vector>
+#include <map>
 #include <unordered_map>
 #include <string>
 #include <algorithm>
 #include <chrono>
+
+int classic_dpegg_limit(int F, int E) {
+  std::map<std::vector<int>, int> reach;  // reach[{d, e}] = max reachable with d drops and e eggs
+  for (int e = 0; e <= E; e++)
+    reach[{0, e}] = 0;
+  for (int d = 1; d <= F; d++)
+    reach[{d, 0}] = 0;
+  for (int d = 1; d <= F; d++) {
+    for (int e = 1; e <= E; e++) {
+      const int N = 1 + reach[{d - 1, e - 1}] + reach[{d - 1, e}];
+      if (N >= F)
+        return d;
+      reach[{d, e}] = N;
+    }
+  }
+  return -1;
+}
 
 struct tState {
 
@@ -112,15 +129,6 @@ namespace std {
 std::ostream& operator<<(std::ostream& os, const tState& s) {
   os << "(e = " << s.eggs << ", lb = " << s.lb << ", ub = " << s.ub << ")";
   return os;
-}
-
-// TODO: check results against the classical algorithm, and also optionally run all possible
-//       examples; taken from the start.. and check that the maximum number of drops is correct !
-//       i.e. print out how many drops should be enough for the given number of floors (and max floors)
-// for each e=1..E determine the minimum number of drops needed to isolate F (or more) floors..
-// put all of it in map<int,int>
-void classic_dpegg_limits(int F, int E) {
-  return;
 }
 
 // Run optimal policy once and return number of drops required to localize the limit floor L
@@ -382,6 +390,8 @@ int main(int argc, char** argv)
   for (int i = 0; i < argc; i++)
     std::cout << argv[i] << " ";
   std::cout << std::endl;
+
+  std::cout << "--- required min. number of drops = " << classic_dpegg_limit(F, E) << std::endl;
 
   std::unordered_map<tState, int> V; // "value function"
   std::unordered_map<tState, int> A; // "control action"
