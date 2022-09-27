@@ -9,9 +9,13 @@ With $127$ floors there are a total of $128$ outcomes (egg breaks at any of the 
 
 ![Access patterns, 128 outcomes](/readme-figures/dpegg-out-127-access.png)
 
-For this case, the minimum maximum number of drops is equal to the average number of drops when the egg budget is saturated. 
+For this case, the minimum maximum number of drops is equal to the average number of drops when the egg budget is saturated. Notice that $2^7=128$.
 
 ![Drops required, 128 outcomes](/readme-figures/dpegg-out-127-drops.png)
 
 ## Example 2
-TBA.
+With $100$ floors ($101$ outcomes) it is possible to find a dynamic programming solution which is skewed (the saturated binary search is not balanced). This allows lower number of drops on average for the same number of maximum drops.
+
+![Access patterns, 101 outcomes](/readme-figures/dpegg-out-100-access.png)
+
+![Drops required, 101 outcomes](/readme-figures/dpegg-out-100-drops.png)
