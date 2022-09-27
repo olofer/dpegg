@@ -23,6 +23,8 @@ There is now a gap between the worst case and the average number of drops at sat
 ![Drops required, 101 outcomes](/readme-figures/dpegg-out-100-drops.png)
 
 ## Example 3
-With $64$ floors, $7$ drops are needed in worst case, but the average is almost $6$ drops (maximal gap in the right hand side plot below). And the access pattern looks symmetric again (left hand side plot).
+With $64$ floors, $7$ drops are still needed in worst case (note that $65 > 2^6$), but the average is almost $6$ drops. And the access pattern looks symmetric again.
 
-![Access patterns 65](/readme-figures/dpegg-out-64-access.png) ![Drops required 65](/readme-figures/dpegg-out-64-drops.png)
+![Access patterns 65](/readme-figures/dpegg-out-64-access.png) 
+
+![Drops required 65](/readme-figures/dpegg-out-64-drops.png)
