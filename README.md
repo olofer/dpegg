@@ -28,3 +28,11 @@ With $64$ floors, $7$ drops are still needed in worst case (note that $65 > 2^6$
 ![Access patterns 65](/readme-figures/dpegg-out-64-access.png) 
 
 ![Drops required 65](/readme-figures/dpegg-out-64-drops.png)
+
+## Task status
+
+- [x] Basic DP solver with tiebreak option
+- [ ] Is search policy skewness maximum when right between powers of two?
+- [ ] Can skewness be kicked the other way if tiebreaking searches from the end index?
+- [ ] More efficient DP solver
+
