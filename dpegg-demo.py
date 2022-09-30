@@ -108,6 +108,11 @@ if __name__ == '__main__':
     assert np.all(F1 == F3)
     assert np.all(D1 >= D2)  # min max #drops >= mean drops
 
+    monotonic_along_F = np.all(np.diff(D2, axis = 0) >= 0)
+    monotonic_along_E = np.all(np.diff(D2, axis = 1) <= 0)
+    fully_monotonic = monotonic_along_F and monotonic_along_E
+    print('table monotonic F/E = {}/{}'.format(monotonic_along_F, monotonic_along_E))
+
     F = F1
     E = np.arange(1, D1.shape[1] + 1)
 
@@ -145,7 +150,9 @@ if __name__ == '__main__':
     plt.axhline(y = D2[-1, -1], color = 'b', linestyle ='--', alpha = 0.50)
     plt.text(1.0, D2[-1, -1], '{:.3f}'.format(D2[-1, -1]), c = 'b', fontweight = 'bold', verticalalignment = 'top')
     plt.text(E[-1], D1[-1, 1] - 1, 'tiebreak: {}'.format(used_tiebreak), 
-             horizontalalignment = 'right', c = 'k', fontsize = 6, fontweight = 'bold')
+             horizontalalignment = 'right', c = 'k', fontsize = 6, fontweight = 'bold', verticalalignment = 'bottom')
+    plt.text(E[-1], D1[-1, 1] - 1, 'monotonic: {}'.format(fully_monotonic), 
+             horizontalalignment = 'right', c = 'k', fontsize = 6, fontweight = 'bold', verticalalignment = 'top')
     plt.legend()
     plt.grid(True)
     plt.title('{} floors'.format(len(F)))
