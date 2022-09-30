@@ -1,8 +1,8 @@
 # dpegg
-Unusually detailed egg drop programming
+Unusually detailed egg drop programming.
 
 ## Overview
-Basic `C++` code (with `Python` parser/plotter demo) that explicitly generates optimal execution paths for the egg drop problem. In general the exact strategy is not unique. There is often wiggle room to improve the average number of drops required, for the same (minimized) maximum number of drops. The average is defined as the mean number of drops taken across all possible (unknown) limit floors.
+Basic `C++` code (with `Python` parser/plotter demo) that explicitly generates optimal execution paths for the egg drop problem. In general the exact strategy is not unique. There may be wiggle room to improve the average number of drops required, for the same (minimized) maximum number of drops. The average is defined as the mean number of drops taken across all possible (unknown) limit floors.
 
 ## Example 1
 With $127$ floors there are a total of $128$ outcomes (egg breaks at any of the 127 floors, or not at all). The figure below shows the concentration of the floor access patterns (which floors the eggs are being dropped from) as the egg budget is increased. With $1$ egg, the search is linear from the bottom floor. With $2$ eggs, smaller linear searches are visible in-between certain spaced key floors. And so on. For $7$ eggs or more, the search settles at a perfectly balanced binary search.
@@ -14,7 +14,7 @@ For this case, the minimum maximum number of drops is equal to the average numbe
 ![Drops required, 128 outcomes](/readme-figures/dpegg-out-127-drops.png)
 
 ## Example 2
-With $100$ floors (i.e. $101$ outcomes) it is possible to find a dynamic programming solution which is skewed (the saturated binary search is not balanced). This allows lower number of drops on average for the same number of maximum drops.
+With $100$ floors (i.e. $101$ outcomes) it is possible to find a dynamic programming solution which is skewed (the saturated binary search is not balanced). Maybe this allows a lower number of drops on average for the same number of maximum drops? At least it illustrates non-uniqueness of the exact search policy. The difference in average performance (compared to the symmetric case) might be of no real significance.
 
 ![Access patterns, 101 outcomes](/readme-figures/dpegg-out-100-access.png)
 
@@ -34,5 +34,6 @@ With $64$ floors, $7$ drops are still needed in worst case (note that $65 > 2^6$
 - [x] Basic DP solver with tiebreak option
 - [ ] Is search policy skewness maximum when right between powers of two?
 - [ ] Can skewness be kicked the other way if tiebreaking searches from the end index?
-- [ ] More efficient DP solver
+- [ ] Visualize the "tiebreak function", it may look crazy
+- [ ] More efficient DP solver, scale to larger number of floors
 
