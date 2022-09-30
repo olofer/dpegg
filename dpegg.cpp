@@ -41,10 +41,12 @@ USAGE:
 
 */
 
-// TODO: allow --random as tie break ?
+// TODO: mean table monotonicity check, --tiebreak actually required or mid-point sufficient?
 // TODO: additional switch forcing argmin to scan from the end of a vector ?
 // TODO: some sort of "minimizing interval" binary search is required to scale to large F
-
+// NOTE: the degrees of freedom from average number of drops might be some "noisy" artifact..
+//       basically there is an allowed interval where optimal drops are possible
+//       (random selection in interval may be fine)
 
 #include <iostream>
 #include <iomanip>
@@ -218,6 +220,9 @@ int argmin(const std::vector<int>& v) {
   return std::distance(v.cbegin(), result);
 }
 
+// admissibility is either 1 if E=1 or full range (if the scan loop order is appropriate)
+// the below function need to be optimized; and refactored.
+
 // An action is admissible if it can lead to a solution (i.e. not using all eggs inconclusively)
 void find_admissible_actions(const tState& s, 
                              const std::unordered_map<tState, int>& V,
@@ -225,7 +230,6 @@ void find_admissible_actions(const tState& s,
                              std::vector<int>& values,
                              bool break_on_increase)
 {
-  // TODO: option to loop over a in reverse
   for (int a = s.lb + 1; a < s.ub; a++) {
     int max_along_f = -1;
     bool all_ok = true;
@@ -272,6 +276,8 @@ void single_scan(int F,
                  bool use_tiebreak = false,
                  int verbosity = 0)
 {
+  const bool break_early = true;
+
   std::vector<int> local_arg;
   std::vector<int> local_val;
 
@@ -280,7 +286,7 @@ void single_scan(int F,
     const int inserts_before_e = inserts;
     const int modifies_before_e = modifies;
 
-    for (int l = 0; l <= F; l++) {
+    for (int l = F; l >= 0; l--) {
       for (int u = l + 1; u <= F + 1; u++) {
         tState thisState = {e, l, u};
         auto this_search = V.find(thisState);
@@ -291,15 +297,23 @@ void single_scan(int F,
         local_arg.clear();
         local_val.clear();
 
-        // search bound: l <= f < u, and e >= 1 eggs available
-        // find best action a that minimizes the worst case search cost
-
-        find_admissible_actions(thisState, V, local_arg, local_val, true);
+        find_admissible_actions(thisState, V, local_arg, local_val, break_early);
 
         if (local_val.size() == 0) {
           if (thisExists)
             std::cout << "existing nodes must have admissible actions" << std::endl;
           continue;
+        }
+
+        if (thisState.eggs == 1) {
+          if (local_val.size() != 1)
+            std::cout << "there should be exactly 1 admissible drop with 1 egg to-go" << std::endl;
+        }
+
+        if (!break_early) {
+          if (thisState.eggs != 1 && static_cast<int>(local_val.size()) != thisState.ub - thisState.lb - 1) {
+            std::cout << "unexpected no. of admissible drops: " << thisState << "; |A| = " << local_val.size() << std::endl; 
+          }
         }
         
         int action_index = argmin(local_val);
@@ -327,12 +341,19 @@ void single_scan(int F,
           }
           int sub_action_index = argmin(ties_totals);
           action = ties[sub_action_index];
+        } else {
+          std::vector<int> ties;
+          for (size_t i = 0; i < local_val.size(); i++) {
+            if (local_val[i] == value)
+              ties.push_back(local_arg[i]);
+          }
+          action = ties[ties.size() >> 1];
         }
 
         if (thisExists) {
           auto this_search_a = A.find(thisState);
           if ((this_search->second > value) || 
-              (use_tiebreak && this_search->second == value && this_search_a->second != action))
+              (this_search->second == value && this_search_a->second != action))  // use_tiebreak && 
           {
             this_search->second = value;
             this_search_a->second = action;
@@ -463,7 +484,7 @@ int main(int argc, char** argv)
     std::cout << std::endl;
   }
 
-  // this table is not monotonic in general unless --tiebreak is specified!
+  // this table may not be monotonic in general unless --tiebreak is specified!
   std::cout << "--- average drops, E = 1.." << E << " ---" << std::endl;
   for (int f = 1; f <= F; f++) {
     std::cout << "floors " << std::setw(3) << f << ": ";
@@ -473,6 +494,9 @@ int main(int argc, char** argv)
     }
     std::cout << std::endl;
   }
+
+  // TODO: call up a tool that returns true/false if the mean table is fully monotonic or not.. 
+  // by row, columns separately, and report the results
 
   std::cout << "--- drop histograms E = 1.." << E << " (F = " << F << ") ---" << std::endl;
   for (int f = 1; f <= F; f++) {
