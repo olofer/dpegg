@@ -43,6 +43,7 @@ USAGE:
 
 // TODO: allow --random as tie break ?
 // TODO: additional switch forcing argmin to scan from the end of a vector ?
+// TODO: some sort of "minimizing interval" binary search is required to scale to large F
 
 
 #include <iostream>
@@ -221,11 +222,11 @@ int argmin(const std::vector<int>& v) {
 void find_admissible_actions(const tState& s, 
                              const std::unordered_map<tState, int>& V,
                              std::vector<int>& actions,
-                             std::vector<int>& values)
+                             std::vector<int>& values,
+                             bool break_on_increase)
 {
-//  if (s.eggs == 0) return;
+  // TODO: option to loop over a in reverse
   for (int a = s.lb + 1; a < s.ub; a++) {
-    int total_sum = 0;
     int max_along_f = -1;
     bool all_ok = true;
     for (int f = s.lb; f < s.ub; f++) {
@@ -235,13 +236,17 @@ void find_admissible_actions(const tState& s,
       all_ok = all_ok && this_ok;
       if (!all_ok) break;
       const int this_value = s.cost(a, f) + search->second;
-      total_sum += this_value;
       if (this_value > max_along_f)
         max_along_f = this_value;
     }
     if (all_ok && max_along_f != -1) {
       actions.push_back(a);
       values.push_back(max_along_f);
+      if (break_on_increase && actions.size() >= 2) {
+        // If max_along_f is larger than the previous entry, then break loop over a early
+        if (values[values.size() - 1] > values[values.size() - 2])
+          break;
+      }
     }
   }
 }
@@ -289,7 +294,7 @@ void single_scan(int F,
         // search bound: l <= f < u, and e >= 1 eggs available
         // find best action a that minimizes the worst case search cost
 
-        find_admissible_actions(thisState, V, local_arg, local_val);
+        find_admissible_actions(thisState, V, local_arg, local_val, true);
 
         if (local_val.size() == 0) {
           if (thisExists)
@@ -305,6 +310,9 @@ void single_scan(int F,
           std::cout << "e,l,u=" << e << "," << l << "," << u << " allows: a=";
           for (auto a : local_arg)
             std::cout << a << " ";
+          std::cout << std::endl << "val(a)=";
+          for (auto va : local_val)
+            std::cout << va << " ";
           std::cout << std::endl;
         }
 
