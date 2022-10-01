@@ -28,7 +28,7 @@ In addition, the mean number of egg-drops is found, and the histogram of possibl
 The optimal strategy (for E > 1) has better worst case but also worse best case (compared to E = 1).
 In general the actions are not entirely unique: same worst case, but different histograms.
 The option --tiebreak is meant to produce a better histogram for the same optimal worst case. 
-With --tiebreak, the mean number of drops across all possibilities should be monotonic along e = 1..E.
+With --tiebreak, the mean number of drops across all possibilities should always be monotonic.
 Otherwise only the worst case number of drops is monotonic (policy not unique).
 
 BUILD:
@@ -41,9 +41,9 @@ USAGE:
 
 */
 
-// TODO: mean table monotonicity check, --tiebreak actually required or mid-point sufficient?
-// TODO: additional switch forcing argmin to scan from the end of a vector ?
 // TODO: some sort of "minimizing interval" binary search is required to scale to large F
+//       perhaps also store optimal drop range [f1, f2] for each decision node?
+
 // NOTE: the degrees of freedom from average number of drops might be some "noisy" artifact..
 //       basically there is an allowed interval where optimal drops are possible
 //       (random selection in interval may be fine)
@@ -220,8 +220,26 @@ int argmin(const std::vector<int>& v) {
   return std::distance(v.cbegin(), result);
 }
 
-// admissibility is either 1 if E=1 or full range (if the scan loop order is appropriate)
-// the below function need to be optimized; and refactored.
+bool calc_maximum_value(const tState& s, 
+                        int action,
+                        const std::unordered_map<tState, int>& V,
+                        int& max)
+{
+  int max_along_f = -1;
+  bool all_ok = true;
+  for (int f = s.lb; f < s.ub; f++) {
+    tState nextState = s.next(action, f);
+    auto search = V.find(nextState);
+    bool this_ok = (search != V.end());
+    all_ok = all_ok && this_ok;
+    if (!all_ok) break;
+    const int this_value = s.cost(action, f) + search->second;
+    if (this_value > max_along_f)
+      max_along_f = this_value;
+  }
+  max = max_along_f;
+  return all_ok;
+}
 
 // An action is admissible if it can lead to a solution (i.e. not using all eggs inconclusively)
 void find_admissible_actions(const tState& s, 
@@ -231,28 +249,43 @@ void find_admissible_actions(const tState& s,
                              bool break_on_increase)
 {
   for (int a = s.lb + 1; a < s.ub; a++) {
-    int max_along_f = -1;
-    bool all_ok = true;
-    for (int f = s.lb; f < s.ub; f++) {
-      tState nextState = s.next(a, f);
-      auto search = V.find(nextState);
-      bool this_ok = (search != V.end());
-      all_ok = all_ok && this_ok;
-      if (!all_ok) break;
-      const int this_value = s.cost(a, f) + search->second;
-      if (this_value > max_along_f)
-        max_along_f = this_value;
-    }
-    if (all_ok && max_along_f != -1) {
-      actions.push_back(a);
-      values.push_back(max_along_f);
-      if (break_on_increase && actions.size() >= 2) {
-        // If max_along_f is larger than the previous entry, then break loop over a early
-        if (values[values.size() - 1] > values[values.size() - 2])
-          break;
-      }
+    int themax = -1;
+    const bool ok = calc_maximum_value(s, a, V, themax);
+    if (!ok || themax == -1)
+      continue;
+    actions.push_back(a);
+    values.push_back(themax);
+    if (break_on_increase && actions.size() >= 2) {
+      if (values[values.size() - 1] > values[values.size() - 2])
+        break;
     }
   }
+}
+
+void print_all_admissible(const tState& s, 
+                          const std::unordered_map<tState, int>& V,
+                          const std::unordered_map<tState, int>* A = nullptr)
+{
+  std::vector<int> a;
+  std::vector<int> v;
+  const bool break_on_increase = false;
+  find_admissible_actions(s, V, a, v, break_on_increase);
+  std::cout << "--- decision @ state " << s << " ---" << std::endl;
+  std::cout << "drops:  ";
+  for (int a_ : a)
+    std::cout << " " << a_;
+  std::cout << std::endl;
+  std::cout << "values: ";
+  for (int v_ : v)
+    std::cout << " " << v_;
+  std::cout << std::endl;
+  if (A == nullptr)
+    return;
+  std::cout << "means: ";
+  for (int a_ : a) {       
+    std::cout << " " << static_cast<double>(total_policy_at(s, a_, *A)) / (s.ub - s.lb);
+  }
+  std::cout << std::endl;
 }
 
 void initialize_terminal_entries(int F, 
@@ -472,6 +505,8 @@ int main(int argc, char** argv)
     std::cout << "min max drops = " << max_drops << " (optimal worst case)" << std::endl;
     std::cout << "mean drops    = " << mean_drops << " (uniform limit floor)" << std::endl;
     std::cout << "drops histg.  = " << histogram_to_string(histo, 0, max_drops) << std::endl;
+
+    print_all_admissible({e, 0, F + 1}, V, &A);
   }
 
   std::cout << "--- min max drops, E = 1.." << E << " ---" << std::endl;
@@ -484,7 +519,7 @@ int main(int argc, char** argv)
     std::cout << std::endl;
   }
 
-  // this table may not be monotonic in general unless --tiebreak is specified!
+  // this table may not be monotonic in general (along F) unless --tiebreak is specified!
   std::cout << "--- average drops, E = 1.." << E << " ---" << std::endl;
   for (int f = 1; f <= F; f++) {
     std::cout << "floors " << std::setw(3) << f << ": ";
@@ -494,9 +529,6 @@ int main(int argc, char** argv)
     }
     std::cout << std::endl;
   }
-
-  // TODO: call up a tool that returns true/false if the mean table is fully monotonic or not.. 
-  // by row, columns separately, and report the results
 
   std::cout << "--- drop histograms E = 1.." << E << " (F = " << F << ") ---" << std::endl;
   for (int f = 1; f <= F; f++) {
