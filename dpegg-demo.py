@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 
 def parse_dpegg_tables(dpeggfile):
 
-  def locate_line(egg, begstr):
-    for l in range(len(egg)):
+  def locate_line(egg, begstr, start = 0):
+    for l in range(start, len(egg)):
       if egg[l].find(begstr) == 0:
         return l
     return -1
@@ -38,6 +38,13 @@ def parse_dpegg_tables(dpeggfile):
       r += 1
     return R
 
+  def parse_row_nonum(s, begstr):
+    if s.find(begstr) != 0:
+      return None
+    isep = s.find(':')
+    rowelems = s[(isep + 1):].split()
+    return [float(e) for e in rowelems]
+
   with open(dpeggfile, 'r') as thefile:
     egg = thefile.readlines()
 
@@ -49,7 +56,23 @@ def parse_dpegg_tables(dpeggfile):
     T2 = parse_table(egg, l2 + 1, 'floors')
     T3 = parse_table(egg, l3 + 1, 'floor')
 
-    return T1, T2, T3, egg
+    VA = {}
+    e = 1 # locate the E = 1 case to find the relevant part in the text data, but only store E > 1 
+    l4 = locate_line(egg, '--- decision @ state (e = {}'.format(e))
+    assert l4 != -1
+    while True:
+      e += 1
+      l4 = locate_line(egg, '--- decision @ state (e = {}'.format(e), l4)
+      if l4 == -1:
+        break
+      r1 = parse_row_nonum(egg[l4 + 1], 'drops')
+      r2 = parse_row_nonum(egg[l4 + 2], 'values')
+      r3 = parse_row_nonum(egg[l4 + 3], 'means')
+      assert len(r1) == len(r2) and len(r1) == len(r3)
+      VA[e] = {'drop' : r1, 'minmax' : r2, 'mean' : r3}
+      l4 += 4
+
+    return T1, T2, T3, VA, egg
 
 def convert_to_numpy(T):
   cols = len(T[0][1])
@@ -66,6 +89,8 @@ if __name__ == '__main__':
 
   parser = argparse.ArgumentParser()
 
+  # TODO: argument for which E to extract decision surface plots..
+
   parser.add_argument('--dpegg-output', type = str, default = 'dpegg-dump', help = 'name of output dump from dpegg (can be pre-existing)')
   parser.add_argument('--eggs', type = int, default = 0, help = 'maximum number of eggs')
   parser.add_argument('--floors', type = int, default = 0, help = 'maximum number of floors')
@@ -74,6 +99,7 @@ if __name__ == '__main__':
   parser.add_argument('--maxfticks', type = int, default = 12, help = 'plot optics')
   parser.add_argument('--figext', type = str, default = 'pdf', help = 'figure file extension (e.g. pdf or png)')
   parser.add_argument('--dpi', type = float, default = 250.0, help = 'print to file PNG option')
+  parser.add_argument('--all-decisions', action = 'store_true', help = 'make initial decision figure for all e = 2..E')
 
   args = parser.parse_args()
 
@@ -91,7 +117,7 @@ if __name__ == '__main__':
 
   if len(args.dpegg_output) > 0:
 
-    T1, T2, T3, egg = parse_dpegg_tables(args.dpegg_output)
+    T1, T2, T3, VA, egg = parse_dpegg_tables(args.dpegg_output)
 
     print('read {} lines from: {}'.format(len(egg), args.dpegg_output))
 
@@ -162,5 +188,19 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.savefig('{}-drops.{}'.format(args.dpegg_output, args.figext), dpi = dpi_option)
     plt.close()
+
+    if len(VA) > 0:
+      elist = [E[-1]] if not args.all_decisions else E[1:] 
+      for e in elist:
+        plt.plot(VA[e]['drop'], VA[e]['minmax'], label = 'minmax (E={})'.format(e))
+        plt.plot(VA[e]['drop'], VA[e]['mean'], label = 'mean (E={})'.format(e))
+        plt.xlabel('Which floor to drop from (decision)')
+        plt.ylabel('Value of decision')
+        plt.grid(True)
+        plt.legend()
+        plt.title('Decision cost surface (@ start node)')
+        plt.tight_layout()
+        plt.savefig('{}-decision-{}.{}'.format(args.dpegg_output, e, args.figext), dpi = dpi_option)
+        plt.close()
 
   print('done.')
