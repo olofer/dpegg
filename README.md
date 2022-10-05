@@ -32,17 +32,18 @@ With $64$ floors, $7$ drops are still needed in worst case (note that $65 > 2^6$
 ![Drops required 65](/readme-figures/dpegg-out-64-drops.png)
 
 ## Diagnosis
-It turns out that there can be a wide range of equally optimal decisions. Here the decision cost surface is visualized for $F=100$ with a basket of $E=7$ unused eggs, assuming that the optimal decision is followed after this (first) drop is made.
+It turns out that there can be a wide range of equally optimal decisions. Here the decision cost surface is visualized for $F=100$ with a basket of $E=7$ unbroken eggs, assuming that the optimal decision is followed after this (first) drop is made.
 
 ![Decision surface example](/readme-figures/dpegg-dump-100-decision-7.png) 
+
+The default is to select the midpoint in the optimizing interval (perhaps without even realizing it). Use the `--left` or `--right` options to select the left or right endpoints in the interval instead.
 
 This is to be explored further.
 
 ## Task status
 
 - [x] Basic DP solver with tiebreak option
-- [ ] Is search policy skewness maximum when right between powers of two?
-- [ ] Can skewness be kicked the other way if tiebreaking searches from the end index? **sure looks so**
+- [x] Egg drop skewness can be selected with `--left` or `--right` option
 - [x] Visualize the "tiebreak function", it may look crazy
 - [ ] More efficient DP solver, scale to larger number of floors
 
