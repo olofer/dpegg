@@ -29,7 +29,7 @@ The optimal strategy (for E > 1) has better worst case but also worse best case 
 In general the actions are not entirely unique: same worst case, but different histograms.
 The option --tiebreak is meant to produce a better histogram for the same optimal worst case. 
 With --tiebreak, the mean number of drops across all possibilities should always be monotonic.
-Otherwise only the worst case number of drops is monotonic (policy not unique).
+Use options --left or --right to further skew the argmin decision when the optimum is an interval.
 
 BUILD:
 
@@ -43,10 +43,6 @@ USAGE:
 
 // TODO: some sort of "minimizing interval" binary search is required to scale to large F
 //       perhaps also store optimal drop range [f1, f2] for each decision node?
-
-// NOTE: the degrees of freedom from average number of drops might be some "noisy" artifact..
-//       basically there is an allowed interval where optimal drops are possible
-//       (random selection in interval may be fine)
 
 #include <iostream>
 #include <iomanip>
@@ -215,9 +211,26 @@ int total_policy_at(const tState& snaught,
   return total_steps;
 }
 
-int argmin(const std::vector<int>& v) {
-  std::vector<int>::const_iterator result = std::min_element(v.cbegin(), v.cend());
+template <typename TV>
+int argmin(const std::vector<TV>& v) {
+  typename std::vector<TV>::const_iterator result = std::min_element(v.cbegin(), v.cend());
   return std::distance(v.cbegin(), result);
+}
+
+template <typename TV>
+int argmin_which(const std::vector<TV>& v, bool left, bool right) {
+  const int leftmost = argmin<TV>(v);
+  if (left)
+    return leftmost;
+  const TV minv = v[leftmost];
+  std::vector<int> ties;
+  for (size_t i = 0; i < v.size(); i++) {
+    if (v[i] == minv)
+      ties.push_back(i);
+  }
+  if (right)
+    return ties[ties.size() - 1];
+  return ties[ties.size() >> 1];
 }
 
 bool calc_maximum_value(const tState& s, 
@@ -288,9 +301,9 @@ void print_all_admissible(const tState& s,
   std::cout << std::endl;
 }
 
-void initialize_terminal_entries(int F, 
-                                 int E, 
-                                 std::unordered_map<tState, int>& V) 
+void initialize_terminal_nodes(int F, 
+                               int E, 
+                               std::unordered_map<tState, int>& V) 
 {
   for (int e = 0; e <= E; e++) {
     for (int f = 0; f <= F; f++) {
@@ -306,13 +319,17 @@ void single_scan(int F,
                  std::unordered_map<tState, int>& A,
                  int& inserts,
                  int& modifies,
-                 bool use_tiebreak = false,
+                 bool use_tiebreak,
+                 bool pick_left,
+                 bool pick_right,
                  int verbosity = 0)
 {
   const bool break_early = true;
 
   std::vector<int> local_arg;
   std::vector<int> local_val;
+  std::vector<int> ties;
+  std::vector<int> ties_totals;
 
   for (int e = Emin; e <= Emax; e++) {
 
@@ -349,7 +366,7 @@ void single_scan(int F,
           }
         }
         
-        int action_index = argmin(local_val);
+        int action_index = argmin<int>(local_val);
         int action = local_arg[action_index];
         int value = local_val[action_index];
 
@@ -363,24 +380,27 @@ void single_scan(int F,
           std::cout << std::endl;
         }
 
-        if (use_tiebreak) {
-          std::vector<int> ties;
-          std::vector<int> ties_totals;
-          for (size_t i = 0; i < local_val.size(); i++) {
-            if (local_val[i] == value) {
-              ties.push_back(local_arg[i]);
-              ties_totals.push_back(total_policy_at(thisState, local_arg[i], A));
-            }
+        ties.clear();
+
+        for (size_t i = 0; i < local_val.size(); i++) {
+          if (local_val[i] == value)
+            ties.push_back(local_arg[i]);
+        }
+
+        if (use_tiebreak && ties.size() > 1) {
+          ties_totals.clear();
+          for (size_t i = 0; i < ties.size(); i++) {
+            ties_totals.push_back(total_policy_at(thisState, ties[i], A));
           }
-          int sub_action_index = argmin(ties_totals);
+          int sub_action_index = argmin_which<int>(ties_totals, pick_left, pick_right);
           action = ties[sub_action_index];
         } else {
-          std::vector<int> ties;
-          for (size_t i = 0; i < local_val.size(); i++) {
-            if (local_val[i] == value)
-              ties.push_back(local_arg[i]);
-          }
-          action = ties[ties.size() >> 1];
+          if (pick_left)
+            action = ties[0];
+          else if (pick_right)
+            action = ties[ties.size() - 1];
+          else
+            action = ties[ties.size() >> 1];
         }
 
         if (thisExists) {
@@ -428,8 +448,8 @@ int as_integer(const char* str) {
 
 int main(int argc, char** argv)
 {
-  if (argc != 3 && argc != 4) {
-    std::cout << "usage: " << argv[0] << " F E [--tiebreak]" << std::endl;
+  if (argc < 3) {
+    std::cout << "usage: " << argv[0] << " F E [--tiebreak --left --right]" << std::endl;
     return 1;
   }
 
@@ -441,10 +461,25 @@ int main(int argc, char** argv)
     return 1;
   }
 
-  const bool use_tiebreak = (argc == 4 && std::string(argv[3]) == "--tiebreak");
+  bool use_tiebreak = false;
+  bool pick_left = false;
+  bool pick_right = false;
 
-  if (argc == 4 && !use_tiebreak) {
-    std::cout << "invalid input(s): only option --tiebreak is recognized" << std::endl;
+  for (int i = 3; i < argc; i++) {
+    if (std::string(argv[i]) == "--tiebreak")
+      use_tiebreak = true;
+    else if (std::string(argv[i]) == "--left")
+      pick_left = true;
+    else if (std::string(argv[i]) == "--right")
+      pick_right = true;
+    else {
+      std::cout << "invalid input: \"" << argv[i] << "\"" << std::endl;
+      return 1;  
+    }
+  }
+
+  if (pick_left && pick_right) {
+    std::cout << "cannot specify both --left and --right" << std::endl;
     return 1;
   }
 
@@ -460,13 +495,13 @@ int main(int argc, char** argv)
 
   auto clock_start = std::chrono::high_resolution_clock::now();
 
-  initialize_terminal_entries(F, E, V);
+  initialize_terminal_nodes(F, E, V);
  
   for (int e = 1; e <= E; e++) {
     for (int s = 0; ; s++) {
       int inserts = 0;
       int modifies = 0;
-      single_scan(F, e, e, V, A, inserts, modifies, use_tiebreak);
+      single_scan(F, e, e, V, A, inserts, modifies, use_tiebreak, pick_left, pick_right);
       //std::cout << "[e = " << e << ", scan = " << s << "]: " << "inserts = " << inserts << ", modifies = " << modifies << std::endl;
       if (inserts == 0 && modifies == 0) {
         std::cout << s + 1 << " scans at level e = " << e << std::endl;
