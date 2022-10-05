@@ -89,12 +89,12 @@ if __name__ == '__main__':
 
   parser = argparse.ArgumentParser()
 
-  # TODO: argument for which E to extract decision surface plots..
-
   parser.add_argument('--dpegg-output', type = str, default = 'dpegg-dump', help = 'name of output dump from dpegg (can be pre-existing)')
   parser.add_argument('--eggs', type = int, default = 0, help = 'maximum number of eggs')
   parser.add_argument('--floors', type = int, default = 0, help = 'maximum number of floors')
   parser.add_argument('--tiebreak', action = 'store_true', help = 'sub-optimize the policy to minimize avg. drops')
+  parser.add_argument('--left', action = 'store_true', help = 'policy left (down) skew')
+  parser.add_argument('--right', action = 'store_true', help = 'policy right (up) skew')
   parser.add_argument('--horizontals', action = 'store_true', help = 'plot optics')
   parser.add_argument('--maxfticks', type = int, default = 12, help = 'plot optics')
   parser.add_argument('--figext', type = str, default = 'pdf', help = 'figure file extension (e.g. pdf or png)')
@@ -108,9 +108,17 @@ if __name__ == '__main__':
   if args.eggs >= 1 and args.floors >= 1:
 
     cmdstring = './dpegg {} {}'.format(args.floors, args.eggs)
+
     if args.tiebreak:
       cmdstring += ' --tiebreak'
+
+    if args.left:
+      cmdstring += ' --left'
+    elif args.right:
+      cmdstring += ' --right'
+
     cmdstring += ' > {}'.format(args.dpegg_output)
+    
     print(cmdstring)
     retcode = os.system(cmdstring)
     assert retcode == 0
